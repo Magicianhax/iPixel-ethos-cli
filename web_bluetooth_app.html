@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ethos LED</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 400px; margin: 0 auto; }
+        h1 { text-align: center; font-size: 24px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #888; font-size: 12px; margin-bottom: 25px; }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .score-card {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .username { color: #888; font-size: 14px; margin-bottom: 5px; }
+        .score { font-size: 72px; font-weight: 700; line-height: 1; }
+        .tier { font-size: 16px; margin-top: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        .last-update { color: #666; font-size: 11px; margin-top: 15px; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        input[type="text"]::placeholder { color: #666; }
+        input[type="text"]:focus { outline: none; border-color: #6c63ff; }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+            accent-color: #6c63ff;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.1s;
+        }
+        button:active { transform: scale(0.98); opacity: 0.9; }
+
+        .btn-connect { background: #007aff; color: #fff; }
+        .btn-connect.connected { background: #27ae60; }
+        .btn-primary { background: #6c63ff; color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn-watch { background: #ff9500; color: #fff; }
+        .btn-watch.active { background: #e74c3c; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+        .btn-row button { flex: 1; }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            font-size: 13px;
+            color: #888;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+        .status-dot.connected { background: #27ae60; }
+
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-label { font-size: 14px; }
+        .settings-value {
+            font-size: 14px;
+            color: #6c63ff;
+            font-weight: 600;
+        }
+
+        .interval-select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .log {
+            background: rgba(0,0,0,0.4);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            max-height: 120px;
+            overflow-y: auto;
+            color: #aaa;
+        }
+
+        .watch-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(255,149,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #ff9500;
+        }
+        .watch-indicator.active { display: flex; }
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: #ff9500;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ethos LED</h1>
+        <div class="subtitle">Web Bluetooth for Phone</div>
+
+        <!-- Connection Status -->
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Not Connected</span>
+        </div>
+
+        <!-- Score Display -->
+        <div class="card score-card">
+            <div class="username" id="usernameDisplay">Enter username below</div>
+            <div class="score" id="scoreDisplay" style="color: #444;">----</div>
+            <div class="tier" id="tierDisplay">-</div>
+            <div class="last-update" id="lastUpdate"></div>
+        </div>
+
+        <!-- Watch Mode Indicator -->
+        <div class="watch-indicator" id="watchIndicator">
+            <span class="pulse"></span>
+            <span>Auto-refresh: <span id="watchCountdown">60</span>s</span>
+        </div>
+
+        <!-- Username Input -->
+        <div class="card">
+            <input type="text" id="usernameInput" placeholder="@username">
+            <button class="btn-primary" onclick="lookupScore()">Check Score</button>
+            <div class="btn-row">
+                <button class="btn-watch" id="watchBtn" onclick="toggleWatch()">Start Watch</button>
+                <select class="interval-select" id="intervalSelect">
+                    <option value="30">30s</option>
+                    <option value="60" selected>60s</option>
+                    <option value="120">2m</option>
+                    <option value="300">5m</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Bluetooth -->
+        <div class="card">
+            <button class="btn-connect" id="connectBtn" onclick="connectBluetooth()">Connect to LED</button>
+        </div>
+
+        <!-- Settings -->
+        <div class="card">
+            <div class="settings-row">
+                <span class="settings-label">Brightness</span>
+                <span class="settings-value" id="brightnessVal">80%</span>
+            </div>
+            <input type="range" id="brightness" min="10" max="100" value="80" oninput="updateBrightness(this.value)">
+        </div>
+
+        <!-- Log -->
+        <div class="card">
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // BLE UUIDs
+        const SERVICE_UUID = '0000fa00-0000-1000-8000-00805f9b34fb';
+        const CHAR_WRITE_UUID = '0000fa02-0000-1000-8000-00805f9b34fb';
+
+        let device = null;
+        let writeChar = null;
+        let currentScore = null;
+        let currentTierColor = 'ffffff';
+        let watchInterval = null;
+        let countdownInterval = null;
+        let countdown = 60;
+
+        // Score tiers
+        const SCORE_TIERS = [
+            [800, "Untrusted", "b72b38"],
+            [1200, "Questionable", "C29010"],
+            [1400, "Neutral", "c1c0b6"],
+            [1600, "Known", "7C8DA8"],
+            [1800, "Established", "4E86B9"],
+            [2000, "Reputable", "2E7BC3"],
+            [2200, "Exemplary", "427B56"],
+            [2400, "Distinguished", "127f31"],
+            [2600, "Revered", "836DA6"],
+            [2800, "Renowned", "7A5EA0"],
+        ];
+
+        function getTier(score) {
+            for (let [threshold, name, color] of SCORE_TIERS) {
+                if (score < threshold) return [name, color];
+            }
+            return ["Renowned", "7A5EA0"];
+        }
+
+        function log(msg) {
+            const el = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            el.innerHTML = `<div>[${time}] ${msg}</div>` + el.innerHTML;
+        }
+
+        function setConnected(connected) {
+            document.getElementById('statusDot').className = 'status-dot' + (connected ? ' connected' : '');
+            document.getElementById('statusText').textContent = connected ? 'Connected' : 'Not Connected';
+            const btn = document.getElementById('connectBtn');
+            btn.textContent = connected ? 'Disconnect' : 'Connect to LED';
+            btn.className = 'btn-connect' + (connected ? ' connected' : '');
+        }
+
+        // Protocol: Build command packet for iPixel
+        function buildTextPacket(text, colorHex) {
+            // Header for text display
+            const header = [0x02, 0x01];
+
+            // Color bytes (RGB)
+            const r = parseInt(colorHex.substr(0, 2), 16);
+            const g = parseInt(colorHex.substr(2, 2), 16);
+            const b = parseInt(colorHex.substr(4, 2), 16);
+
+            // Text bytes
+            const textBytes = new TextEncoder().encode(text);
+
+            // Build packet: [header, color, text length, text]
+            const packet = new Uint8Array(header.length + 3 + 1 + textBytes.length);
+            let i = 0;
+
+            // Header
+            packet[i++] = 0x02;
+            packet[i++] = 0x01;
+
+            // Color
+            packet[i++] = r;
+            packet[i++] = g;
+            packet[i++] = b;
+
+            // Text length
+            packet[i++] = textBytes.length;
+
+            // Text
+            for (let j = 0; j < textBytes.length; j++) {
+                packet[i++] = textBytes[j];
+            }
+
+            return packet;
+        }
+
+        function buildBrightnessPacket(level) {
+            // Brightness command
+            return new Uint8Array([0x01, 0x02, level]);
+        }
+
+        async function connectBluetooth() {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+                setConnected(false);
+                log('Disconnected');
+                return;
+            }
+
+            try {
+                log('Scanning...');
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'LED' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                device.addEventListener('gattserverdisconnected', () => {
+                    setConnected(false);
+                    log('Disconnected');
+                });
+
+                log('Connecting...');
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                writeChar = await service.getCharacteristic(CHAR_WRITE_UUID);
+
+                setConnected(true);
+                log('Connected: ' + device.name);
+
+                // Set initial brightness
+                await updateBrightness(document.getElementById('brightness').value);
+
+            } catch (e) {
+                log('Error: ' + e.message);
+                setConnected(false);
+            }
+        }
+
+        async function sendToLED(text, color) {
+            if (!writeChar) {
+                log('LED not connected');
+                return false;
+            }
+
+            try {
+                // Try sending as simple text first (pypixelcolor style)
+                const textBytes = new TextEncoder().encode(text);
+
+                // Many LED devices accept plain text
+                await writeChar.writeValue(textBytes);
+                log('Sent: ' + text);
+                return true;
+            } catch (e) {
+                log('Send failed: ' + e.message);
+                return false;
+            }
+        }
+
+        async function updateBrightness(val) {
+            document.getElementById('brightnessVal').textContent = val + '%';
+            if (writeChar) {
+                try {
+                    const packet = buildBrightnessPacket(parseInt(val));
+                    await writeChar.writeValue(packet);
+                } catch (e) {
+                    // Ignore brightness errors
+                }
+            }
+        }
+
+        async function lookupScore() {
+            const username = document.getElementById('usernameInput').value.trim().replace('@', '');
+            if (!username) {
+                log('Enter a username');
+                return;
+            }
+
+            log('Looking up @' + username);
+
+            try {
+                const res = await fetch(`https://api.ethos.network/api/v2/user/by/x/${username}`);
+
+                if (!res.ok) {
+                    log('User not found');
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (data.score !== undefined) {
+                    const prevScore = currentScore;
+                    currentScore = data.score;
+                    const [tierName, tierColor] = getTier(currentScore);
+                    currentTierColor = tierColor;
+
+                    // Update UI
+                    document.getElementById('usernameDisplay').textContent = '@' + (data.username || username);
+                    document.getElementById('scoreDisplay').textContent = currentScore;
+                    document.getElementById('scoreDisplay').style.color = '#' + tierColor;
+                    document.getElementById('tierDisplay').textContent = tierName;
+                    document.getElementById('tierDisplay').style.color = '#' + tierColor;
+                    document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+
+                    // Show change if watching
+                    if (prevScore !== null && prevScore !== currentScore) {
+                        const diff = currentScore - prevScore;
+                        log(`Score: ${currentScore} (${diff > 0 ? '+' : ''}${diff})`);
+                    } else {
+                        log(`Score: ${currentScore} (${tierName})`);
+                    }
+
+                    // Send to LED
+                    await sendToLED(String(currentScore), tierColor);
+                }
+            } catch (e) {
+                log('Error: ' + e.message);
+            }
+        }
+
+        function toggleWatch() {
+            const btn = document.getElementById('watchBtn');
+            const indicator = document.getElementById('watchIndicator');
+
+            if (watchInterval) {
+                // Stop watching
+                clearInterval(watchInterval);
+                clearInterval(countdownInterval);
+                watchInterval = null;
+                btn.textContent = 'Start Watch';
+                btn.className = 'btn-watch';
+                indicator.className = 'watch-indicator';
+                log('Watch stopped');
+            } else {
+                // Start watching
+                const username = document.getElementById('usernameInput').value.trim();
+                if (!username) {
+                    log('Enter username first');
+                    return;
+                }
+
+                const interval = parseInt(document.getElementById('intervalSelect').value);
+                countdown = interval;
+
+                // Initial lookup
+                lookupScore();
+
+                // Start countdown display
+                countdownInterval = setInterval(() => {
+                    countdown--;
+                    document.getElementById('watchCountdown').textContent = countdown;
+                    if (countdown <= 0) countdown = interval;
+                }, 1000);
+
+                // Start refresh interval
+                watchInterval = setInterval(() => {
+                    lookupScore();
+                    countdown = interval;
+                }, interval * 1000);
+
+                btn.textContent = 'Stop Watch';
+                btn.className = 'btn-watch active';
+                indicator.className = 'watch-indicator active';
+                log('Watching every ' + interval + 's');
+            }
+        }
+
+        // Init
+        if (!navigator.bluetooth) {
+            log('Web Bluetooth not supported! Use Chrome on Android.');
+            document.getElementById('connectBtn').disabled = true;
+        } else {
+            log('Ready. Enter username and connect to LED.');
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('usernameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') lookupScore();
+        });
+    </script>
+</body>
+</html>

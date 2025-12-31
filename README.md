@@ -1,6 +1,21 @@
-# Ethos CLI
+# Ethos LED
 
-Check Ethos scores from your phone via command line. Optionally display on LED strip.
+Check Ethos scores and display on LED strip. Works on phone via Web Bluetooth.
+
+## Web App (Easiest for Phone)
+
+Open in Chrome on Android: **[web_bluetooth_app.html](web_bluetooth_app.html)**
+
+Or host it yourself and open on phone:
+```
+https://magicianhax.github.io/iPixel-ethos-cli/web_bluetooth_app.html
+```
+
+Features:
+- Connect to LED via Bluetooth directly from phone
+- Auto-refresh watch mode (30s/60s/2m/5m)
+- Score change notifications
+- Brightness control
 
 ## Quick Start (Phone)
 
