@@ -214,9 +214,9 @@
     </div>
 
     <script>
-        // BLE UUIDs
-        const SERVICE_UUID = '0000fa00-0000-1000-8000-00805f9b34fb';
-        const CHAR_WRITE_UUID = '0000fa02-0000-1000-8000-00805f9b34fb';
+        // BLE UUIDs - will be discovered automatically
+        let SERVICE_UUID = null;
+        let CHAR_WRITE_UUID = null;
 
         let device = null;
         let writeChar = null;
@@ -311,11 +311,19 @@
                 return;
             }
 
+            // Common BLE service UUIDs to try
+            const KNOWN_SERVICES = [
+                0xfa00,  // iPixel service (short)
+                0xfff0,  // Common LED service
+                0xffe0,  // Common BLE service
+                '0000fa00-0000-1000-8000-00805f9b34fb',  // iPixel full UUID
+            ];
+
             try {
-                log('Scanning...');
+                log('Scanning for LED...');
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'LED' }],
-                    optionalServices: [SERVICE_UUID]
+                    optionalServices: KNOWN_SERVICES
                 });
 
                 device.addEventListener('gattserverdisconnected', () => {
@@ -323,16 +331,38 @@
                     log('Disconnected');
                 });
 
-                log('Connecting...');
+                log('Connecting to ' + device.name + '...');
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                writeChar = await service.getCharacteristic(CHAR_WRITE_UUID);
 
-                setConnected(true);
-                log('Connected: ' + device.name);
+                // Try each known service
+                for (const svcUuid of KNOWN_SERVICES) {
+                    try {
+                        log('Trying service: ' + svcUuid.toString(16));
+                        const service = await server.getPrimaryService(svcUuid);
+                        const chars = await service.getCharacteristics();
 
-                // Set initial brightness
-                await updateBrightness(document.getElementById('brightness').value);
+                        for (const char of chars) {
+                            const props = char.properties;
+                            log('  Char: ' + char.uuid.substring(4, 8) + ' W:' + (props.write || props.writeWithoutResponse));
+                            if (props.write || props.writeWithoutResponse) {
+                                writeChar = char;
+                                log('Found writable char!');
+                                break;
+                            }
+                        }
+                        if (writeChar) break;
+                    } catch (e) {
+                        // Service not found, try next
+                    }
+                }
+
+                if (writeChar) {
+                    setConnected(true);
+                    log('Connected! Ready to send.');
+                } else {
+                    log('No writable characteristic. Try Python CLI on PC.');
+                    setConnected(false);
+                }
 
             } catch (e) {
                 log('Error: ' + e.message);
