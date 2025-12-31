@@ -1,104 +1,86 @@
-# Ethos LED Display
+# Ethos CLI
 
-Display your Ethos score on an LED strip with color-coded tiers.
+Check Ethos scores from your phone via command line. Optionally display on LED strip.
 
-## Running on Phone
+## Quick Start (Phone)
 
 ### Android (Termux)
 
-1. **Install Termux** from F-Droid (recommended) or Play Store
-   - F-Droid: https://f-droid.org/packages/com.termux/
+```bash
+# 1. Install Termux from F-Droid
+# https://f-droid.org/packages/com.termux/
 
-2. **Open Termux** and run these commands:
-   ```bash
-   pkg update && pkg upgrade
-   pkg install python git
-   pip install pypixelcolor
-   ```
+# 2. Setup
+pkg update && pkg upgrade
+pkg install python git
 
-3. **Copy the script** to your phone:
-   ```bash
-   # Option A: Clone from git (if you have a repo)
-   git clone <your-repo-url>
+# 3. Clone & Run
+git clone https://github.com/Magicianhax/iPixel-ethos-cli.git
+cd iPixel-ethos-cli
+python ethos_led.py
+```
 
-   # Option B: Download directly
-   curl -O https://your-url/ethos_led.py
+### iOS (a-Shell)
 
-   # Option C: Copy manually
-   # Put ethos_led.py in your Downloads folder, then:
-   cp /sdcard/Download/ethos_led.py ~
-   ```
-
-4. **Run the script**:
-   ```bash
-   python ethos_led.py
-   ```
-
-5. **Select from menu**:
-   ```
-   ========================================
-          ETHOS LED DISPLAY
-   ========================================
-
-     1. Check score (one-time)
-     2. Watch score (auto-refresh)
-     3. Change refresh interval
-     4. Quit
-   ```
-
-### iOS (a-Shell or iSH)
-
-1. **Install a-Shell** from App Store (easier) or **iSH** (more powerful)
-
-2. **In a-Shell**, run:
-   ```bash
-   pip install pypixelcolor
-   ```
-
-3. **Copy script** via Files app to a-Shell's folder
-
-4. **Run**:
-   ```bash
-   python ethos_led.py
-   ```
-
-## Alternative: SSH from Phone
-
-If Bluetooth doesn't work directly from your phone, run the script on a PC/Raspberry Pi and SSH into it:
-
-1. **On your PC/Pi**, keep the script running
-
-2. **On your phone**, install an SSH app:
-   - Android: Termux or JuiceSSH
-   - iOS: Termux, Blink, or Prompt
-
-3. **Connect via SSH**:
-   ```bash
-   ssh user@192.168.x.x
-   cd /path/to/script
-   python ethos_led.py
-   ```
+```bash
+# Install a-Shell from App Store, then:
+pip install requests
+# Copy ethos_led.py via Files app
+python ethos_led.py
+```
 
 ## Usage
 
-### Interactive Menu (recommended for phone)
+### Interactive Menu (default)
 ```bash
 python ethos_led.py
 ```
 
-### Command Line
-```bash
-# One-time check
-python ethos_led.py username
+```
+========================================
+       ETHOS LED DISPLAY
+========================================
 
-# Watch mode (refresh every 60s)
-python ethos_led.py username --watch
+  1. Check score (one-time)
+  2. Watch score (auto-refresh)
+  3. Change refresh interval
+  4. Toggle LED [OFF (score only)]
+  5. Quit
 
-# Custom refresh interval (30 seconds)
-python ethos_led.py username --watch 30
+----------------------------------------
+  Refresh interval: 60s
+
+Select option (1-5):
 ```
 
-## Score Tiers & Colors
+### Command Line
+```bash
+# One-time check (no LED)
+python ethos_led.py username --no-led
+
+# Watch mode - refresh every 60s
+python ethos_led.py username --watch --no-led
+
+# Custom interval (30 seconds)
+python ethos_led.py username --watch 30 --no-led
+```
+
+## LED Mode (PC/Raspberry Pi only)
+
+Bluetooth LED display only works on Linux/Windows/Mac - not on phones.
+
+To use LED features:
+1. Run on a PC or Raspberry Pi
+2. Toggle LED ON in menu (option 4)
+3. Or omit `--no-led` flag in CLI
+
+```bash
+# With LED (requires pypixelcolor)
+pip install pypixelcolor
+python ethos_led.py username --watch
+```
+
+## Score Tiers
 
 | Score | Tier | Color |
 |-------|------|-------|
@@ -112,20 +94,3 @@ python ethos_led.py username --watch 30
 | < 2400 | Distinguished | Dark Green |
 | < 2600 | Revered | Purple |
 | 2600+ | Renowned | Deep Purple |
-
-## Troubleshooting
-
-**Bluetooth not connecting?**
-- Make sure LED strip is powered on and in range
-- On Android, grant Termux location permission (required for BLE)
-- Try restarting Bluetooth on your phone
-
-**Permission denied?**
-```bash
-chmod +x ethos_led.py
-```
-
-**Module not found?**
-```bash
-pip install pypixelcolor
-```

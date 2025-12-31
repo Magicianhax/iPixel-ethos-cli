@@ -1,18 +1,27 @@
 """
-Ethos Score Display on LED Strip
-Shows score with color based on tier
+Ethos Score CLI
+Check Ethos scores from command line with optional LED display.
 
 Usage:
+    python ethos_led.py                         # Interactive menu
     python ethos_led.py <username>              # One-time display
     python ethos_led.py <username> --watch      # Auto-refresh every 60s
     python ethos_led.py <username> --watch 30   # Auto-refresh every 30s
+    python ethos_led.py <username> --no-led     # Score only (no LED)
 """
 import asyncio
 import urllib.request
 import json
 import sys
 from datetime import datetime
-from pypixelcolor import AsyncClient
+
+# Optional LED support (not available on phones)
+try:
+    from pypixelcolor import AsyncClient
+    LED_AVAILABLE = True
+except ImportError:
+    LED_AVAILABLE = False
+    AsyncClient = None
 
 DEVICE_ADDRESS = "5D:C8:1C:36:B7:AC"
 ETHOS_API = "https://api.ethos.network/api/v2/user/by/x/"
@@ -57,7 +66,7 @@ def get_ethos_score(twitter_username: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-async def display_ethos_score(twitter_username: str, device=None):
+async def display_ethos_score(twitter_username: str, device=None, led_enabled=True):
     """Fetch and display Ethos score on LED strip"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"\n[{timestamp}] Looking up @{twitter_username}...")
@@ -75,6 +84,10 @@ async def display_ethos_score(twitter_username: str, device=None):
     print(f"Score: {score}")
     print(f"Tier: {tier_name} (#{tier_color})")
 
+    # Skip LED if disabled
+    if not led_enabled:
+        return score
+
     # Connect to LED if no device passed
     should_disconnect = False
     if device is None:
@@ -85,7 +98,7 @@ async def display_ethos_score(twitter_username: str, device=None):
         should_disconnect = True
 
     # Display score with tier color
-    print(f"Displaying: {score}")
+    print(f"Displaying on LED: {score}")
     await device.set_brightness(80)
     await device.send_text(str(score), color=tier_color)
 
@@ -97,23 +110,28 @@ async def display_ethos_score(twitter_username: str, device=None):
     return score
 
 
-async def watch_ethos_score(twitter_username: str, interval: int = DEFAULT_REFRESH_INTERVAL):
+async def watch_ethos_score(twitter_username: str, interval: int = DEFAULT_REFRESH_INTERVAL, led_enabled=True):
     """Continuously monitor and display Ethos score"""
     print(f"\n{'=' * 40}")
     print(f"WATCHING @{twitter_username}")
     print(f"Refresh interval: {interval}s | Ctrl+C to stop")
+    print(f"LED: {'ON' if led_enabled else 'OFF'}")
     print(f"{'=' * 40}")
 
-    # Connect once and keep connection open
-    print(f"\nConnecting to LED strip...")
-    device = AsyncClient(DEVICE_ADDRESS)
-    await device.connect()
-    print("Connected! Starting watch mode...\n")
+    device = None
+    if led_enabled:
+        # Connect once and keep connection open
+        print(f"\nConnecting to LED strip...")
+        device = AsyncClient(DEVICE_ADDRESS)
+        await device.connect()
+        print("Connected! Starting watch mode...\n")
+    else:
+        print("\nStarting watch mode (score only)...\n")
 
     last_score = None
     try:
         while True:
-            score = await display_ethos_score(twitter_username, device)
+            score = await display_ethos_score(twitter_username, device, led_enabled)
 
             if score is not None and last_score is not None and score != last_score:
                 diff = score - last_score
@@ -125,18 +143,24 @@ async def watch_ethos_score(twitter_username: str, interval: int = DEFAULT_REFRE
     except KeyboardInterrupt:
         print("\n\nStopping watch mode...")
     finally:
-        await device.disconnect()
-        print("Disconnected. Goodbye!")
+        if device:
+            await device.disconnect()
+        print("Goodbye!")
 
-def show_menu():
+def show_menu(led_enabled: bool):
     """Display the main menu"""
     print("\n" + "=" * 40)
-    print("       ETHOS LED DISPLAY")
+    print("         ETHOS SCORE CLI")
     print("=" * 40)
-    print("\n  1. Check score (one-time)")
-    print("  2. Watch score (auto-refresh)")
-    print("  3. Change refresh interval")
-    print("  4. Quit")
+    if LED_AVAILABLE:
+        led_status = "ON" if led_enabled else "OFF"
+    else:
+        led_status = "N/A (install pypixelcolor)"
+    print(f"\n  1. Check score (one-time)")
+    print(f"  2. Watch score (auto-refresh)")
+    print(f"  3. Change refresh interval")
+    print(f"  4. Toggle LED [{led_status}]")
+    print(f"  5. Quit")
     print("\n" + "-" * 40)
 
 
@@ -144,15 +168,16 @@ async def interactive_mode():
     """Interactive menu-based mode"""
     refresh_interval = DEFAULT_REFRESH_INTERVAL
     last_username = None
+    led_enabled = False  # Default OFF for phone compatibility
 
     while True:
-        show_menu()
+        show_menu(led_enabled)
         if last_username:
             print(f"  Last user: @{last_username}")
         print(f"  Refresh interval: {refresh_interval}s")
         print()
 
-        choice = input("Select option (1-4): ").strip()
+        choice = input("Select option (1-5): ").strip()
 
         if choice == '1':
             username = input("\nEnter Twitter/X username: ").strip().lstrip('@')
@@ -160,7 +185,7 @@ async def interactive_mode():
                 print("Invalid username")
                 continue
             last_username = username
-            await display_ethos_score(username)
+            await display_ethos_score(username, led_enabled=led_enabled)
             input("\nPress Enter to continue...")
 
         elif choice == '2':
@@ -178,7 +203,7 @@ async def interactive_mode():
                 continue
 
             last_username = username
-            await watch_ethos_score(username, refresh_interval)
+            await watch_ethos_score(username, refresh_interval, led_enabled)
 
         elif choice == '3':
             try:
@@ -191,7 +216,17 @@ async def interactive_mode():
             except ValueError:
                 print("Invalid number")
 
-        elif choice == '4' or choice.lower() == 'q':
+        elif choice == '4':
+            if not LED_AVAILABLE:
+                print("\nLED not available. Install pypixelcolor on PC/Pi.")
+                continue
+            led_enabled = not led_enabled
+            status = "ON" if led_enabled else "OFF"
+            print(f"\nLED display: {status}")
+            if led_enabled:
+                print("Note: LED requires Bluetooth.")
+
+        elif choice == '5' or choice.lower() == 'q':
             print("\nGoodbye!")
             break
 
@@ -206,6 +241,7 @@ async def main():
         return
 
     username = args[0].lstrip('@')
+    led_enabled = '--no-led' not in args
 
     # Check for --watch flag
     if '--watch' in args or '-w' in args:
@@ -217,9 +253,9 @@ async def main():
                     interval = int(args[i + 1])
                 except ValueError:
                     pass
-        await watch_ethos_score(username, interval)
+        await watch_ethos_score(username, interval, led_enabled)
     else:
-        await display_ethos_score(username)
+        await display_ethos_score(username, led_enabled=led_enabled)
 
 
 if __name__ == "__main__":
